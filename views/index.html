@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tho's MUD</title>
+<style>
+#map { margin: 0; padding: 0; list-style: none; font-family: monospace; font-size: 20px; }
+#map li { display: inline-block; }
+#map .ground { color: #0f0; background-color: #0a0; }
+#map .water { color: #00f; background-color: #00a; }
+#map .player { color: #ff0; background-color: #333; }
+#chat { margin: 0; padding: 0; list-style: none; border: 1px solid #ccc; height: 200px; font-family: monospace; font-size: 10px; overflow: auto; }
+#chat li { display: block; padding: 5px; }
+#chat li:nth-child(odd) { background-color: #fafafa; }
+#chat li:nth-child(even) { background-color: #f0f0f0; }
+#chat li.log { color: #555; }
+</style>
+</head>
+<body>
+
+<ul id="map"></ul>
+<div id="coords"></div>
+
+<div id="controls">
+    <button id="up" data-cmd="n">^</button>
+    <button id="left" data-cmd="w">&lt;</button>
+    <button id="right" data-cmd="e">&gt;</button>
+    <button id="down" data-cmd="s">v</button>
+</div>
+
+<ul id="chat"></ul>
+<form id="chat-form"><input type="text" id="chat-input"/><button id="chat-submit">Send</button></form>
+
+<script src="http://code.jquery.com/jquery-1.11.1.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    var socket = io();
+    
+    // commands
+    $('#controls button').click(function() {
+        socket.emit('move', $(this).data('cmd'));
+    });
+    $(document).keyup(function(e) {
+        if (e.target.tagName == 'INPUT') return;
+        var action;
+        var param;
+        switch (e.keyCode) {
+            case 38: // north
+                action = 'move';
+                param = 'n';
+                break;
+            case 40: // south
+                action = 'move';
+                param = 's';
+                break;
+            case 37: // west
+                action = 'move';
+                param = 'w';
+                break;
+            case 39: // east
+                action = 'move';
+                param = 'e';
+                break;
+            default:
+                break;
+        }
+        if (action) socket.emit(action,param);
+    });
+    $('#chat-form').submit(function (e) {
+        e.preventDefault();
+        if ($('#chat-input').val() != '') {
+            socket.emit('chat', $('#chat-input').val());
+            $('#chat-input').val('');
+        }
+    });
+    
+    
+    // socket
+    socket.on('player coords', function(coords) {
+        $('#coords').html('X: '+coords[1]+'<br/>Y: '+coords[0]);
+    });
+    socket.on('map', function(map) {
+        $('#map').html('');
+        for (var i = 0; i < map.length; i++) {
+            for (var j = 0; j < map[i].length; j++) {
+                var elem;
+                switch (map[i][j]) {
+                    case '.':
+                        elem = '<span class="ground">.</span>';
+                        break;
+                    case '~':
+                        elem = '<span class="water">~</span>';
+                        break;
+                    case '*':
+                        elem = '<span class="player" title="You">*</span>';
+                        break;
+                }
+                $('<li></li>').html(elem).appendTo('#map');
+            }
+            $('<br/>').appendTo('#map');
+        }
+    });
+    socket.on('chat', function(msg) {
+        $('<li></li>').text(msg).appendTo('#chat');
+        $('#chat')[0].scrollTop = $('#chat')[0].scrollHeight;
+    });
+    socket.on('log', function(msg) {
+        $('<li class="log"></li>').text(msg).appendTo('#chat');
+        $('#chat')[0].scrollTop = $('#chat')[0].scrollHeight;
+    });
+</script>
+</body>
+</html>
