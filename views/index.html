@@ -9,8 +9,9 @@
 #map .ground { color: #0f0; background-color: #0a0; }
 #map .water { color: #00f; background-color: #00a; }
 #map .player { color: #ff0; background-color: #333; }
+#map .someone { color: #ff7f00; background-color: #333; }
 #chat { margin: 0; padding: 0; list-style: none; border: 1px solid #ccc; height: 200px; font-family: monospace; font-size: 10px; overflow: auto; }
-#chat li { display: block; padding: 5px; }
+#chat li { display: block; padding: 5px; white-space: pre-line; }
 #chat li:nth-child(odd) { background-color: #fafafa; }
 #chat li:nth-child(even) { background-color: #f0f0f0; }
 #chat li.log { color: #555; }
@@ -20,6 +21,7 @@
 
 <ul id="map"></ul>
 <div id="coords"></div>
+<div id="wih"></div>
 
 <div id="controls">
     <button id="up" data-cmd="n">^</button>
@@ -41,7 +43,7 @@
         socket.emit('move', $(this).data('cmd'));
     });
     $(document).keyup(function(e) {
-        if (e.target.tagName == 'INPUT') return;
+        if ((e.target.tagName == 'INPUT') && (e.keyCode != 27)) return;
         var action;
         var param;
         switch (e.keyCode) {
@@ -60,6 +62,12 @@
             case 39: // east
                 action = 'move';
                 param = 'e';
+                break;
+            case 27: // esc
+                $('input').blur();
+                break;
+            case 84: // T
+                $('#chat-input').focus();
                 break;
             default:
                 break;
@@ -94,6 +102,12 @@
                     case '*':
                         elem = '<span class="player" title="You">*</span>';
                         break;
+                    case '!':
+                        elem = '<span class="someone" title="Someone">*</span>';
+                        break;
+                    default:
+                        elem = '<span>'+map[i][j]+'</span>';
+                        break;
                 }
                 $('<li></li>').html(elem).appendTo('#map');
             }
@@ -107,6 +121,11 @@
     socket.on('log', function(msg) {
         $('<li class="log"></li>').text(msg).appendTo('#chat');
         $('#chat')[0].scrollTop = $('#chat')[0].scrollHeight;
+    });
+    socket.on('what is here', function(items) {
+        $('#wih').html('');
+        for (var i = 0; i < items.length; i++)
+            $('<li></li>').text(items[i]).appendTo('#wih');
     });
 </script>
 </body>

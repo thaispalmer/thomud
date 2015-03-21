@@ -18,6 +18,7 @@ function Map(file) {
     this.spawn = null;
     this.warp = null;
     this.name = null;
+    this.playersAt = null;
     
     this.load = function (file) {
         var data = fs.readFileSync('maps/'+file+'.map');
@@ -28,8 +29,13 @@ function Map(file) {
         this.dimensions[0] = parseInt(this.dimensions[0]);
         this.dimensions[1] = parseInt(this.dimensions[1]);
         this.data = [];
+        this.playersAt = [];
         for (var i = 1; i <= this.dimensions[0]; i++) {
             this.data[i-1] = data[i];
+            this.playersAt[i-1] = [];
+            for (var j = 0; j < this.dimensions[1]; j++) {
+                this.playersAt[i-1][j] = [];
+            }
         }
         this.warp = [];
         for (var i = this.dimensions[0]+1; i < data.length; i++) {
@@ -51,7 +57,8 @@ function Map(file) {
 
 /* --- */
 
-worldmap = new Map('world');
+maps = {};
+maps['world'] = new Map('world');
 
 /* --- */
 
@@ -63,15 +70,19 @@ app.get('/', function(req, res){
 
 io.on('connection', function(socket) {
     console.log('[+] A user connected.');
-    io.emit('log', '* A new player joined the game.');
+    io.emit('log', '['+getTimestamp()+'] * A new player joined the game.');
     socket.player = new Player();
-    socket.player.map = worldmap.name;
-    socket.player.coords = worldmap.spawn;
+    socket.player.map = 'world';
+    socket.player.coords = maps['world'].spawn;
+    maps[socket.player.map].playersAt[socket.player.coords[0]][socket.player.coords[1]].push(socket);
     sendCoords(socket);
-    drawVisible(socket);
+    updateNearby(socket);
     socket.on('disconnect', function(){
         console.log('[-] User disconnected.');
-        io.emit('log', '* A player has left the game.');
+        io.emit('log', '['+getTimestamp()+'] * '+socket.player.name+' has left the game.');
+        var socketIndex = maps[socket.player.map].playersAt[socket.player.coords[0]][socket.player.coords[1]].indexOf(socket);
+        maps[socket.player.map].playersAt[socket.player.coords[0]][socket.player.coords[1]].splice(socketIndex,1);
+        updateNearby(socket);
     });
     socket.on('move', function(direction) {
         var x = 0;
@@ -99,26 +110,34 @@ io.on('connection', function(socket) {
 
         // calculating new coords
         var newcoords = [socket.player.coords[0], socket.player.coords[1]];
-        if (socket.player.coords[0]+y == worldmap.dimensions[0]) newcoords[0] = 0;
-        else if (socket.player.coords[0]+y < 0) newcoords[0] = worldmap.dimensions[0] - 1;
+        if (socket.player.coords[0]+y == maps[socket.player.map].dimensions[0]) newcoords[0] = 0;
+        else if (socket.player.coords[0]+y < 0) newcoords[0] = maps[socket.player.map].dimensions[0] - 1;
         else newcoords[0] += y;
 
-        if (socket.player.coords[1]+x == worldmap.dimensions[1]) newcoords[1] = 0;
-        else if (socket.player.coords[1]+x < 0) newcoords[1] = worldmap.dimensions[1] - 1;
+        if (socket.player.coords[1]+x == maps[socket.player.map].dimensions[1]) newcoords[1] = 0;
+        else if (socket.player.coords[1]+x < 0) newcoords[1] = maps[socket.player.map].dimensions[1] - 1;
         else newcoords[1] += x;
 
         // collision
-        switch (worldmap.data[newcoords[0]][newcoords[1]]) {
+        switch (maps[socket.player.map].data[newcoords[0]][newcoords[1]]) {
             case '~':
                 break;
             default:
+                // removing actual player location on the map for other players
+                var socketIndex = maps[socket.player.map].playersAt[socket.player.coords[0]][socket.player.coords[1]].indexOf(socket);
+                maps[socket.player.map].playersAt[socket.player.coords[0]][socket.player.coords[1]].splice(socketIndex,1);
+                // updating player's own location
                 socket.player.coords = newcoords;
+                // updating player location on the map for other players
+                maps[socket.player.map].playersAt[socket.player.coords[0]][socket.player.coords[1]].push(socket);
+
+                // updating map of nearby players and the client itself
+                updateNearby(socket);
+
+                // sending coords to the client
+                sendCoords(socket);
                 break;
         }
-        
-        // sending map to the client
-        sendCoords(socket);
-        drawVisible(socket);
     });
     socket.on('chat', function(msg) {
         if (msg.substr(0,1) == '/') {
@@ -126,12 +145,23 @@ io.on('connection', function(socket) {
             switch (params[0]) {
                 case 'help':
                     var message = "*** Help ***\n";
-                    message += "*** /name <new_name> - Changes your player name.";
+                    message += "*** /name <new_name> - Changes your player name.\n";
+                    message += "*** /map - Shows the full map.\n";
+                    message += "*** /players - Shows the players online.";
                     socket.emit('log', message);
                     break;
                 case 'name':
-                    io.emit('log', '* '+socket.player.name+' has changed name to '+params[1]);
+                    io.emit('log', '['+getTimestamp()+'] * '+socket.player.name+' has changed name to '+params[1]);
                     socket.player.name = params[1];
+                    break;
+                case 'map':
+                    drawFullMap(socket);
+                    break;
+                case 'players':
+                    var message = "*** Players online: "+io.sockets.sockets.length+" ***\n";
+                    for (var i = 0; i < io.sockets.sockets.length; i++)
+                        message += "*** "+io.sockets.sockets[i].player.name+"\n";
+                    socket.emit('log', message);
                     break;
                 default:
                     socket.emit('log', '*** Unknown command.');
@@ -152,8 +182,8 @@ http.listen(3000, function(){
 
 function drawFullMap(socket) {
     var buffer = [];
-    for (var i = 0; i < worldmap.dimensions[0]; i++) {
-        buffer[i] = worldmap.data[i];
+    for (var i = 0; i < maps[socket.player.map].dimensions[0]; i++) {
+        buffer[i] = maps[socket.player.map].data[i];
         if (i == socket.player.coords[0])
             buffer[i] = buffer[i].substr(0,socket.player.coords[1]) + '*' + buffer[i].substr(socket.player.coords[1]+1);
     }
@@ -168,20 +198,50 @@ function drawVisible(socket) {
     var index = 0;
     for (var i = socket.player.coords[0]-limit[0]; i <= socket.player.coords[0]+limit[0]; i++) {
         buffer[index] = '';
-        if (i >= worldmap.dimensions[0]) map_y = i-worldmap.dimensions[0];
-        else if (i < 0) map_y = worldmap.dimensions[0]+i;
+        if (i >= maps[socket.player.map].dimensions[0]) map_y = i-maps[socket.player.map].dimensions[0];
+        else if (i < 0) map_y = maps[socket.player.map].dimensions[0]+i;
         else map_y = i;
         for (var j = socket.player.coords[1]-limit[1]; j <= socket.player.coords[1]+limit[1]; j++) {
-            if (j >= worldmap.dimensions[1]) map_x = j-worldmap.dimensions[1];
-            else if (j < 0) map_x = worldmap.dimensions[1]+j;
+            if (j >= maps[socket.player.map].dimensions[1]) map_x = j-maps[socket.player.map].dimensions[1];
+            else if (j < 0) map_x = maps[socket.player.map].dimensions[1]+j;
             else map_x = j;
-            
-            if ((socket.player.coords[0] == map_y) && (socket.player.coords[1] == map_x)) buffer[index] += '*';
-            else buffer[index] += worldmap.data[map_y][map_x];
+            // buffers the map surrounding the client
+            if ((socket.player.coords[0] == map_y) && (socket.player.coords[1] == map_x)) buffer[index] += '*'; // player
+            else if (maps[socket.player.map].playersAt[map_y][map_x].length > 0) buffer[index] += '!'; // some other players
+            else buffer[index] += maps[socket.player.map].data[map_y][map_x]; // the map stuff itself
         }
         index++;
     }
     socket.emit('map',buffer);
+}
+
+function whatIsHere(socket) {
+    var total = maps[socket.player.map].playersAt[socket.player.coords[0]][socket.player.coords[1]].length;
+    var items = [];
+    for (var i = 0; i < total; i++) {
+        if (maps[socket.player.map].playersAt[socket.player.coords[0]][socket.player.coords[1]][i] == socket) continue;
+        items.push(maps[socket.player.map].playersAt[socket.player.coords[0]][socket.player.coords[1]][i].player.name);
+    }
+    socket.emit('what is here',items);
+}
+
+function updateNearby(socket) {
+    var limit = [3,3];
+    for (var i = socket.player.coords[0]-limit[0]; i <= socket.player.coords[0]+limit[0]; i++) {
+        if (i >= maps[socket.player.map].dimensions[0]) map_y = i-maps[socket.player.map].dimensions[0];
+        else if (i < 0) map_y = maps[socket.player.map].dimensions[0]+i;
+        else map_y = i;
+        for (var j = socket.player.coords[1]-limit[1]; j <= socket.player.coords[1]+limit[1]; j++) {
+            if (j >= maps[socket.player.map].dimensions[1]) map_x = j-maps[socket.player.map].dimensions[1];
+            else if (j < 0) map_x = maps[socket.player.map].dimensions[1]+j;
+            else map_x = j;
+            // broadcast to nearby players including the client itself
+            for (var k = 0; k < maps[socket.player.map].playersAt[map_y][map_x].length; k++) {
+                drawVisible(maps[socket.player.map].playersAt[map_y][map_x][k]);
+                whatIsHere(maps[socket.player.map].playersAt[map_y][map_x][k]);
+            }
+        }
+    }
 }
 
 function sendCoords(socket) {
