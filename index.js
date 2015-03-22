@@ -18,6 +18,7 @@ function Map(file) {
     this.spawn = null;
     this.warp = null;
     this.name = null;
+	this.title = null;
     this.playersAt = null;
     
     this.load = function (file) {
@@ -25,9 +26,9 @@ function Map(file) {
         data = data.toString();
         data = data.split("\n");
         this.name = file;
-        this.dimensions = data[0].split(',');
-        this.dimensions[0] = parseInt(this.dimensions[0]);
-        this.dimensions[1] = parseInt(this.dimensions[1]);
+        var info = data[0].split(',');
+		this.title = info[0];
+		this.dimensions = [parseInt(info[1]), parseInt(info[2])];
         this.data = [];
         this.playersAt = [];
         for (var i = 1; i <= this.dimensions[0]; i++) {
@@ -44,11 +45,18 @@ function Map(file) {
                 if (area[0] == '_spawn') this.spawn = [parseInt(area[1]),parseInt(area[2])];
                 else {
                     this.warp.push({
-                        name: area[0],
+                        map: area[0],
                         coords: [parseInt(area[1]),parseInt(area[2])]
                     });
                 }
             }
+			else if (area.length == 5) {
+				this.warp.push({
+					map: area[0],
+					coords: [parseInt(area[1]),parseInt(area[2])],
+					destination: [parseInt(area[3]),parseInt(area[4])]
+				});
+			}
         }
     };
     
@@ -58,7 +66,8 @@ function Map(file) {
 /* --- */
 
 maps = {};
-maps['world'] = new Map('world');
+maps.world = new Map('world');
+maps.city = new Map('city');
 
 /* --- */
 
@@ -118,26 +127,58 @@ io.on('connection', function(socket) {
         else if (socket.player.coords[1]+x < 0) newcoords[1] = maps[socket.player.map].dimensions[1] - 1;
         else newcoords[1] += x;
 
-        // collision
-        switch (maps[socket.player.map].data[newcoords[0]][newcoords[1]]) {
-            case '~':
-                break;
-            default:
-                // removing actual player location on the map for other players
-                var socketIndex = maps[socket.player.map].playersAt[socket.player.coords[0]][socket.player.coords[1]].indexOf(socket);
-                maps[socket.player.map].playersAt[socket.player.coords[0]][socket.player.coords[1]].splice(socketIndex,1);
-                // updating player's own location
-                socket.player.coords = newcoords;
-                // updating player location on the map for other players
-                maps[socket.player.map].playersAt[socket.player.coords[0]][socket.player.coords[1]].push(socket);
+		// check if there's a warp in this position
+		var warp = -1;
+		for (var i = 0; i < maps[socket.player.map].warp.length; i++) {
+			if ((maps[socket.player.map].warp[i].coords[0] == newcoords[0]) && (maps[socket.player.map].warp[i].coords[1] == newcoords[1])) {
+				warp = i;
+				break;
+			}
+		}
+        if (warp != -1) {
+			// removing actual player location on the map for other players
+			var socketIndex = maps[socket.player.map].playersAt[socket.player.coords[0]][socket.player.coords[1]].indexOf(socket);
+			maps[socket.player.map].playersAt[socket.player.coords[0]][socket.player.coords[1]].splice(socketIndex,1);
+			updateNearby(socket);
+			// updating player's own location and map
+			if (typeof maps[socket.player.map].warp[warp].destination !== 'undefined') {
+				socket.player.coords = maps[socket.player.map].warp[warp].destination;
+				//socket.player.coords[0] = maps[warp].destination[0];
+				//socket.player.coords[1] = maps[warp].destination[1];
+			}
+			else
+				socket.player.coords = maps[maps[socket.player.map].warp[warp].map].spawn;
+			socket.player.map = maps[socket.player.map].warp[warp].map;
+			// updating player location on the map for other players
+			maps[socket.player.map].playersAt[socket.player.coords[0]][socket.player.coords[1]].push(socket);
+			// updating map of nearby players and the client itself
+			updateNearby(socket);
+			// sending coords to the client
+			sendCoords(socket);
+		}
+		else {
+			// collision
+			switch (maps[socket.player.map].data[newcoords[0]][newcoords[1]]) {
+				case '~':
+				case '-':
+					break;
+				default:
+					// removing actual player location on the map for other players
+					var socketIndex = maps[socket.player.map].playersAt[socket.player.coords[0]][socket.player.coords[1]].indexOf(socket);
+					maps[socket.player.map].playersAt[socket.player.coords[0]][socket.player.coords[1]].splice(socketIndex,1);
+					// updating player's own location
+					socket.player.coords = newcoords;
+					// updating player location on the map for other players
+					maps[socket.player.map].playersAt[socket.player.coords[0]][socket.player.coords[1]].push(socket);
 
-                // updating map of nearby players and the client itself
-                updateNearby(socket);
+					// updating map of nearby players and the client itself
+					updateNearby(socket);
 
-                // sending coords to the client
-                sendCoords(socket);
-                break;
-        }
+					// sending coords to the client
+					sendCoords(socket);
+					break;
+			}
+		}
     });
     socket.on('chat', function(msg) {
         if (msg.substr(0,1) == '/') {
@@ -226,7 +267,7 @@ function whatIsHere(socket) {
 }
 
 function updateNearby(socket) {
-    var limit = [3,3];
+    var limit = [4,4];
     for (var i = socket.player.coords[0]-limit[0]; i <= socket.player.coords[0]+limit[0]; i++) {
         if (i >= maps[socket.player.map].dimensions[0]) map_y = i-maps[socket.player.map].dimensions[0];
         else if (i < 0) map_y = maps[socket.player.map].dimensions[0]+i;
@@ -245,7 +286,10 @@ function updateNearby(socket) {
 }
 
 function sendCoords(socket) {
-    socket.emit('player coords',socket.player.coords);
+    socket.emit('player coords',{
+		title: maps[socket.player.map].title,
+		coords: socket.player.coords
+	});
 }
 
 function getTimestamp() {

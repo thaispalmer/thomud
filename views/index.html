@@ -10,6 +10,8 @@
 #map .water { color: #00f; background-color: #00a; }
 #map .player { color: #ff0; background-color: #333; }
 #map .someone { color: #ff7f00; background-color: #333; }
+#map .city { color: #d00; background-color: #ddd; }
+#map .wall { color: #999; background-color: #ccc; }
 #chat { margin: 0; padding: 0; list-style: none; border: 1px solid #ccc; height: 200px; font-family: monospace; font-size: 10px; overflow: auto; }
 #chat li { display: block; padding: 5px; white-space: pre-line; }
 #chat li:nth-child(odd) { background-color: #fafafa; }
@@ -84,8 +86,8 @@
     
     
     // socket
-    socket.on('player coords', function(coords) {
-        $('#coords').html('X: '+coords[1]+'<br/>Y: '+coords[0]);
+    socket.on('player coords', function(data) {
+        $('#coords').html(data.title+'<br/>'+'X: '+data.coords[1]+'<br/>Y: '+data.coords[0]);
     });
     socket.on('map', function(map) {
         $('#map').html('');
@@ -104,6 +106,12 @@
                         break;
                     case '!':
                         elem = '<span class="someone" title="Someone">*</span>';
+                        break;
+					case '^':
+                        elem = '<span class="city" title="City">^</span>';
+                        break;
+					case '-':
+                        elem = '<span class="wall">-</span>';
                         break;
                     default:
                         elem = '<span>'+map[i][j]+'</span>';
