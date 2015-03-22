@@ -71,6 +71,9 @@
             case 84: // T
                 $('#chat-input').focus();
                 break;
+			case 77: // M
+				socket.emit('chat', '/map');
+				break;
             default:
                 break;
         }
