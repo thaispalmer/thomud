@@ -188,7 +188,8 @@ io.on('connection', function(socket) {
                     var message = "*** Help ***\n";
                     message += "*** /name <new_name> - Changes your player name.\n";
                     message += "*** /map - Shows the full map.\n";
-                    message += "*** /players - Shows the players online.";
+                    message += "*** /players - Shows the players online.\n";
+					message += "*** /hotkeys - Displays the available hotkeys.";
                     socket.emit('log', message);
                     break;
                 case 'name':
@@ -202,6 +203,14 @@ io.on('connection', function(socket) {
                     var message = "*** Players online: "+io.sockets.sockets.length+" ***\n";
                     for (var i = 0; i < io.sockets.sockets.length; i++)
                         message += "*** "+io.sockets.sockets[i].player.name+"\n";
+                    socket.emit('log', message);
+                    break;
+				case 'hotkeys':
+                    var message = "*** Hotkeys ***\n";
+                    message += "*** Arrow keys - Moves the character.\n";
+                    message += "*** T - Goes to the chat input.\n";
+                    message += "*** Escape - Leaves the chat input and goes back to the game.\n";
+					message += "*** M - Displays the full map.";
                     socket.emit('log', message);
                     break;
                 default:
