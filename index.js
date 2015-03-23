@@ -79,6 +79,7 @@ app.get('/', function(req, res){
 
 io.on('connection', function(socket) {
     console.log('[+] A user connected.');
+    socket.emit('log', '*** Welcome to the game, type /help to see the list of commands.');
     io.emit('log', '['+getTimestamp()+'] * A new player joined the game.');
     socket.player = new Player();
     socket.player.map = 'world';
