@@ -81,6 +81,7 @@ io.on('connection', function(socket) {
     console.log('[+] A user connected.');
     socket.emit('log', '*** Welcome to the game, type /help to see the list of commands.');
     io.emit('log', '['+getTimestamp()+'] * A new player joined the game.');
+	// creating player data
     socket.player = new Player();
     socket.player.map = 'world';
     socket.player.coords = maps['world'].spawn;
@@ -144,8 +145,6 @@ io.on('connection', function(socket) {
 			// updating player's own location and map
 			if (typeof maps[socket.player.map].warp[warp].destination !== 'undefined') {
 				socket.player.coords = maps[socket.player.map].warp[warp].destination;
-				//socket.player.coords[0] = maps[warp].destination[0];
-				//socket.player.coords[1] = maps[warp].destination[1];
 			}
 			else
 				socket.player.coords = maps[maps[socket.player.map].warp[warp].map].spawn;
@@ -158,7 +157,7 @@ io.on('connection', function(socket) {
 			sendCoords(socket);
 		}
 		else {
-			// collision
+			// checking collision
 			switch (maps[socket.player.map].data[newcoords[0]][newcoords[1]]) {
 				case '~':
 				case '-':

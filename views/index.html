@@ -4,23 +4,205 @@
 <meta charset="UTF-8">
 <title>Tho's MUD</title>
 <style>
+/* Viewport */
+* { box-sizing: border-box; }
+body { background-color: #000; }
+#viewport {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+}
+
+/* Elements */
+*:focus { outline: none; }
+button {
+	background-color: #a44;
+	border: 1px solid #a44;
+	box-shadow: inset 0 0 0 1px #faa;
+	color: #fff;
+	cursor: pointer;
+}
+button:hover {
+	background-color: #af4f4f;
+}
+button:active {
+	background-color: #933;
+	border: 1px solid #933;
+	color: #fee;
+}
+
+/* Map */
+#map-container {
+	position: absolute;
+	top: 0;
+	left: 0;
+	background-color: #000;
+	width: 70%;
+	height: 70%;
+}
+#map {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%,-50%) scaleX(1.5);
+	white-space: nowrap;
+}
+#coords {
+	background-color: rgba(0,0,0,0.5);
+	color: #fff;
+	text-shadow: 1px 1px 2px #000;
+	position: absolute;
+	top: 0;
+	left: 0;
+	opacity: 0.5;
+	padding: 0.5em;
+}
+#coords:hover { opacity: 1; }
+
+/* Right column */
+#right-col {
+	position: absolute;
+	right: 0;
+	top: 0;
+	width: 30%;
+	height: 100%;
+	background: linear-gradient(#888,#222);
+	box-shadow: inset 30px 0 30px -30px #555;
+	color: #fff;
+	text-shadow: 1px 1px 1px #000;
+	text-align: center;
+}
+
+/* What is Here */
+#wih {
+	display: block;
+	margin: 1em;
+	list-style: none;
+	box-sizing: content-box;
+}
+#wih li {
+	display: block;
+	background-color: rgba(0,0,0,0.3);
+	border: 1px solid rgba(0,0,0,0.2);
+	padding: 0.2em 0.5em;
+	margin-bottom: -1px;
+	text-align: left;
+}
+
+/* Controls */
+#controls {
+	display: inline-block;
+	margin: 1em auto;
+}
+#controls .column {
+	display: table-cell;
+	vertical-align: middle;
+}
+#up, #down, #left, #right {
+	display: block;
+	width: 4em;
+	height: 3em;
+}
+#up:after, #down:after, #left:after, #right:after {
+	content: '';
+	width: 1em;
+	height: 1em;
+	display: inline-block;
+	border-bottom: 2px solid #fff;
+	border-right: 2px solid #fff;
+}
+#up:after { transform: rotate(-135deg); }
+#down:after { transform: rotate(45deg); }
+#left:after { transform: rotate(135deg); }
+#right:after { transform: rotate(-45deg); }
+	
+/* Chat */
+#chat-container {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	width: 70%;
+	height: 30%;
+	display: flex;
+	flex-direction: column;
+}
+#chat {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	font-family: monospace;
+	font-size: 10px;
+	overflow: auto;
+	height: 100%;
+	width: 100%;
+	background-color: #111;
+}
+#chat li { display: block; padding: 5px; white-space: pre-line; color: #f0f0f0; }
+#chat li:nth-child(odd) { background-color: #2a2a2a; }
+#chat li:nth-child(even) { background-color: #333; }
+#chat li.log { color: #ff7; }
+#chat-form {
+	width: 100%;
+	height: 1.8em;
+	display: block;
+	border-top: 1px solid #000;
+}
+#chat-input {
+	width: 80%;
+	height: 1.7em;
+	border: 0;
+	color: #fff;
+	background-color: #222;
+	padding: 0 0.5em;
+}
+#chat-input:focus { background-color: #2a2a2a; }
+#chat-submit {
+	width: 20%;
+	height: 1.7em;
+}
+	
+/* Map sprites */
 #map { margin: 0; padding: 0; list-style: none; font-family: monospace; font-size: 20px; }
-#map li { display: inline-block; }
+#map li { display: inline-block; text-align: left; }
 #map .ground { color: #0f0; background-color: #0a0; }
 #map .water { color: #00f; background-color: #00a; }
 #map .player { color: #ff0; background-color: #333; }
 #map .someone { color: #ff7f00; background-color: #333; }
 #map .city { color: #d00; background-color: #ddd; }
 #map .wall { color: #999; background-color: #ccc; }
-#chat { margin: 0; padding: 0; list-style: none; border: 1px solid #ccc; height: 200px; font-family: monospace; font-size: 10px; overflow: auto; }
-#chat li { display: block; padding: 5px; white-space: pre-line; }
-#chat li:nth-child(odd) { background-color: #fafafa; }
-#chat li:nth-child(even) { background-color: #f0f0f0; }
-#chat li.log { color: #555; }
 </style>
 </head>
 <body>
 
+<div id="viewport">
+	<div id="map-container">
+		<ul id="map"></ul>
+		<div id="coords"></div>
+	</div>
+	<div id="right-col">
+		<div id="controls">
+			<div class="column">
+				<button id="left" data-cmd="w"></button>
+			</div>
+			<div class="column">
+				<button id="up" data-cmd="n"></button>
+				<button id="down" data-cmd="s"></button>
+			</div>
+			<div class="column">
+				<button id="right" data-cmd="e"></button>
+			</div>
+		</div>
+		<div id="wih"></div>
+	</div>
+	<div id="chat-container">
+		<div id="chat"></div>
+		<form id="chat-form"><input type="text" id="chat-input"/><button id="chat-submit">Send</button></form>
+	</div>
+</div>
+	
+<!--
 <ul id="map"></ul>
 <div id="coords"></div>
 <div id="wih"></div>
@@ -34,110 +216,110 @@
 
 <ul id="chat"></ul>
 <form id="chat-form"><input type="text" id="chat-input"/><button id="chat-submit">Send</button></form>
-
+-->
 <script src="http://code.jquery.com/jquery-1.11.1.js"></script>
 <script src="/socket.io/socket.io.js"></script>
 <script>
-    var socket = io();
-    
-    // commands
-    $('#controls button').click(function() {
-        socket.emit('move', $(this).data('cmd'));
-    });
-    $(document).keyup(function(e) {
-        if ((e.target.tagName == 'INPUT') && (e.keyCode != 27)) return;
-        var action;
-        var param;
-        switch (e.keyCode) {
-            case 38: // north
-                action = 'move';
-                param = 'n';
-                break;
-            case 40: // south
-                action = 'move';
-                param = 's';
-                break;
-            case 37: // west
-                action = 'move';
-                param = 'w';
-                break;
-            case 39: // east
-                action = 'move';
-                param = 'e';
-                break;
-            case 27: // esc
-                $('input').blur();
-                break;
-            case 84: // T
-                $('#chat-input').focus();
-                break;
+	var socket = io();
+
+	// commands
+	$('#controls button').click(function() {
+		socket.emit('move', $(this).data('cmd'));
+	});
+	$(document).keyup(function(e) {
+		if ((e.target.tagName == 'INPUT') && (e.keyCode != 27)) return;
+		var action;
+		var param;
+		switch (e.keyCode) {
+			case 38: // north
+				action = 'move';
+				param = 'n';
+				break;
+			case 40: // south
+				action = 'move';
+				param = 's';
+				break;
+			case 37: // west
+				action = 'move';
+				param = 'w';
+				break;
+			case 39: // east
+				action = 'move';
+				param = 'e';
+				break;
+			case 27: // esc
+				$('input').blur();
+				break;
+			case 84: // T
+				$('#chat-input').focus();
+				break;
 			case 77: // M
 				socket.emit('chat', '/map');
 				break;
-            default:
-                break;
-        }
-        if (action) socket.emit(action,param);
-    });
-    $('#chat-form').submit(function (e) {
-        e.preventDefault();
-        if ($('#chat-input').val() != '') {
-            socket.emit('chat', $('#chat-input').val());
-            $('#chat-input').val('');
-        }
-    });
-    
-    
-    // socket
-    socket.on('player coords', function(data) {
-        $('#coords').html(data.title+'<br/>'+'X: '+data.coords[1]+'<br/>Y: '+data.coords[0]);
-    });
-    socket.on('map', function(map) {
-        $('#map').html('');
-        for (var i = 0; i < map.length; i++) {
-            for (var j = 0; j < map[i].length; j++) {
-                var elem;
-                switch (map[i][j]) {
-                    case '.':
-                        elem = '<span class="ground">.</span>';
-                        break;
-                    case '~':
-                        elem = '<span class="water">~</span>';
-                        break;
-                    case '*':
-                        elem = '<span class="player" title="You">*</span>';
-                        break;
-                    case '!':
-                        elem = '<span class="someone" title="Someone">*</span>';
-                        break;
+			default:
+				break;
+		}
+		if (action) socket.emit(action, param);
+	});
+	$('#chat-form').submit(function(e) {
+		e.preventDefault();
+		if ($('#chat-input').val() != '') {
+			socket.emit('chat', $('#chat-input').val());
+			$('#chat-input').val('');
+		}
+	});
+
+
+	// socket
+	socket.on('player coords', function(data) {
+		$('#coords').html(data.title + '<br/>' + 'X: ' + data.coords[1] + ', Y: ' + data.coords[0]);
+	});
+	socket.on('map', function(map) {
+		$('#map').html('');
+		for (var i = 0; i < map.length; i++) {
+			for (var j = 0; j < map[i].length; j++) {
+				var elem;
+				switch (map[i][j]) {
+					case '.':
+						elem = '<span class="ground">.</span>';
+						break;
+					case '~':
+						elem = '<span class="water">~</span>';
+						break;
+					case '*':
+						elem = '<span class="player" title="You">*</span>';
+						break;
+					case '!':
+						elem = '<span class="someone" title="Someone">*</span>';
+						break;
 					case '^':
-                        elem = '<span class="city" title="City">^</span>';
-                        break;
+						elem = '<span class="city" title="City">^</span>';
+						break;
 					case '-':
-                        elem = '<span class="wall">-</span>';
-                        break;
-                    default:
-                        elem = '<span>'+map[i][j]+'</span>';
-                        break;
-                }
-                $('<li></li>').html(elem).appendTo('#map');
-            }
-            $('<br/>').appendTo('#map');
-        }
-    });
-    socket.on('chat', function(msg) {
-        $('<li></li>').text(msg).appendTo('#chat');
-        $('#chat')[0].scrollTop = $('#chat')[0].scrollHeight;
-    });
-    socket.on('log', function(msg) {
-        $('<li class="log"></li>').text(msg).appendTo('#chat');
-        $('#chat')[0].scrollTop = $('#chat')[0].scrollHeight;
-    });
-    socket.on('what is here', function(items) {
-        $('#wih').html('');
-        for (var i = 0; i < items.length; i++)
-            $('<li></li>').text(items[i]).appendTo('#wih');
-    });
+						elem = '<span class="wall">-</span>';
+						break;
+					default:
+						elem = '<span>' + map[i][j] + '</span>';
+						break;
+				}
+				$('<li></li>').html(elem).appendTo('#map');
+			}
+			$('<br/>').appendTo('#map');
+		}
+	});
+	socket.on('chat', function(msg) {
+		$('<li></li>').text(msg).appendTo('#chat');
+		$('#chat')[0].scrollTop = $('#chat')[0].scrollHeight;
+	});
+	socket.on('log', function(msg) {
+		$('<li class="log"></li>').text(msg).appendTo('#chat');
+		$('#chat')[0].scrollTop = $('#chat')[0].scrollHeight;
+	});
+	socket.on('what is here', function(items) {
+		$('#wih').html('');
+		for (var i = 0; i < items.length; i++)
+			$('<li></li>').text(items[i]).appendTo('#wih');
+	});
 </script>
 </body>
 </html>
