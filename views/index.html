@@ -47,6 +47,8 @@ button:active {
 	position: absolute;
 	top: 50%;
 	left: 50%;
+	-webkit-transform: translate(-50%,-50%) scaleX(1.5);
+	-moz-transform: translate(-50%,-50%) scaleX(1.5);
 	transform: translate(-50%,-50%) scaleX(1.5);
 	white-space: nowrap;
 }
@@ -69,6 +71,8 @@ button:active {
 	top: 0;
 	width: 30%;
 	height: 100%;
+	background: -webkit-linear-gradient(#888,#222);
+	background: -moz-linear-gradient(#888,#222);
 	background: linear-gradient(#888,#222);
 	box-shadow: inset 30px 0 30px -30px #555;
 	color: #fff;
@@ -157,10 +161,29 @@ button:active {
 	border-bottom: 2px solid #fff;
 	border-right: 2px solid #fff;
 }
-#up:after { transform: rotate(-135deg); }
-#down:after { transform: rotate(45deg); }
-#left:after { transform: rotate(135deg); }
-#right:after { transform: rotate(-45deg); }
+#up:after {
+	-webkit-transform: rotate(-135deg);
+	-moz-transform: rotate(-135deg);
+	transform: rotate(-135deg);
+}
+
+#down:after {
+	-webkit-transform: rotate(45deg);
+	-moz-transform: rotate(45deg);
+	transform: rotate(45deg);
+}
+
+#left:after {
+	-webkit-transform: rotate(135deg);
+	-moz-transform: rotate(135deg);
+	transform: rotate(135deg);
+}
+
+#right:after {
+	-webkit-transform: rotate(-45deg);
+	-moz-transform: rotate(-45deg);
+	transform: rotate(-45deg);
+}
 	
 /* Chat */
 #chat-container {
