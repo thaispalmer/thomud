@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Tho's MUD</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>ThoMUD</title>
 <style>
 /* Viewport */
 * { box-sizing: border-box; }
@@ -73,7 +74,50 @@ button:active {
 	color: #fff;
 	text-shadow: 1px 1px 1px #000;
 	text-align: center;
+	overflow-y: auto;
 }
+#header h2 {
+	font-size: 0.8em;
+	font-weight: bold;
+	letter-spacing: 0.2em;
+	text-shadow: 1px 1px 1px rgba(0,0,0,0.2);
+	text-align: center;
+	color: #bbb;
+	margin: 1em;
+}
+#playerName {
+	font-size: 1.2em;
+	color: #fff;
+	text-align: center;
+	display: block;
+	text-shadow: 1px 1px 1px rgba(0,0,0,0.5);
+	margin-bottom: 1em;
+}
+	
+/* Stats */
+#stats {
+	background-color: rgba(0,0,0,0.1);
+	border: 1px solid rgba(0,0,0,0.2);
+	margin: 1em;
+	padding: 1em;
+}
+#stats span {
+	display: block;
+	color: #fff;
+	text-shadow: 1px 1px 1px rgba(0,0,0,0.3);
+	font-weight: bold;
+	font-size: 1em;
+}
+#stats span:before {
+	font-weight: normal;
+	font-size: 0.9em;
+	color: #eee;
+}
+#level:before { content: 'Level: '; }
+#exp:before { content: 'EXP: '; }
+#statStr:before { content: 'STR: '; }
+#statDex:before { content: 'DEX: '; }
+#statInt:before { content: 'INT: '; }
 
 /* What is Here */
 #wih {
@@ -172,6 +216,8 @@ button:active {
 #map .someone { color: #ff7f00; background-color: #333; }
 #map .city { color: #d00; background-color: #ddd; }
 #map .wall { color: #999; background-color: #ccc; }
+#map .road { color: #a97; background-color: #974; }
+#map .tree { color: #0a0; background-color: #040; }
 </style>
 </head>
 <body>
@@ -182,6 +228,18 @@ button:active {
 		<div id="coords"></div>
 	</div>
 	<div id="right-col">
+		<div id="header">
+			<h2>ThoMUD</h2>
+			<span id="playerName"></span>
+		</div>
+		<div id="stats">
+			<span id="level"></span>
+			<span id="exp"></span>
+			<hr/>
+			<span id="statStr"></span>
+			<span id="statDex"></span>
+			<span id="statInt"></span>
+		</div>
 		<div id="controls">
 			<div class="column">
 				<button id="left" data-cmd="w"></button>
@@ -201,22 +259,7 @@ button:active {
 		<form id="chat-form"><input type="text" id="chat-input"/><button id="chat-submit">Send</button></form>
 	</div>
 </div>
-	
-<!--
-<ul id="map"></ul>
-<div id="coords"></div>
-<div id="wih"></div>
 
-<div id="controls">
-    <button id="up" data-cmd="n">^</button>
-    <button id="left" data-cmd="w">&lt;</button>
-    <button id="right" data-cmd="e">&gt;</button>
-    <button id="down" data-cmd="s">v</button>
-</div>
-
-<ul id="chat"></ul>
-<form id="chat-form"><input type="text" id="chat-input"/><button id="chat-submit">Send</button></form>
--->
 <script src="http://code.jquery.com/jquery-1.11.1.js"></script>
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -298,6 +341,12 @@ button:active {
 					case '-':
 						elem = '<span class="wall">-</span>';
 						break;
+					case ',':
+						elem = '<span class="road">.</span>';
+						break;
+					case '@':
+						elem = '<span class="tree">@</span>';
+						break;
 					default:
 						elem = '<span>' + map[i][j] + '</span>';
 						break;
@@ -319,6 +368,16 @@ button:active {
 		$('#wih').html('');
 		for (var i = 0; i < items.length; i++)
 			$('<li></li>').text(items[i]).appendTo('#wih');
+	});
+	socket.on('player name', function(name) {
+		$('#playerName').text(name);
+	});
+	socket.on('stats', function(stats) {
+		$('#level').text(stats.level);
+		$('#exp').text(stats.exp);
+		$('#statStr').text(stats.stats.str);
+		$('#statDex').text(stats.stats.dex);
+		$('#statInt').text(stats.stats.int);
 	});
 </script>
 </body>
