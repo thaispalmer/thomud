@@ -115,6 +115,53 @@ function Map(file) {
     if (file) this.load(file);
 }
 
+function Npc(file) {
+	this.id = new Date().getTime()+''+Math.floor(Math.random()*10000);
+	this.name = null;
+	this.map = null;
+	this.spawn = null;
+	this.type = null;
+	this.speed = null;
+	this.coords = null;
+	this.npc = true;
+	
+	this.load = function(file) {
+		var data = fs.readFileSync('npcs/'+file+'.npc');
+        data = data.toString();
+        data = data.split("\n");
+		for (var i = 0; i < data.length; i++) {
+			var attribute = data[i].substr(0,data[i].indexOf(':'));
+			var value = data[i].substr(data[i].indexOf(':')+1);
+			switch (attribute) {
+				case 'name':
+				case 'map':
+				case 'type':
+					this[attribute] = value;
+					break;
+				case 'speed':
+					this[attribute] = parseInt(value);
+					break;
+				case 'spawn':
+					this[attribute] = value.split(',');
+					this[attribute][0] = parseInt(this[attribute][0]);
+					this[attribute][1] = parseInt(this[attribute][1]);
+					break;
+				default:
+					break;
+			}
+		}
+		if (this.spawn) this.spawnNow();
+	};
+	
+	this.spawnNow = function() {
+		this.coords = [this.spawn[0],this.spawn[1]];
+		maps[this.map].playersAt[this.spawn[0]][this.spawn[1]].push(this);
+		npcs.spawned.push(this);
+	};
+
+	if (file) this.load(file);
+}
+
 /* --- */
 
 function loadMaps() {
@@ -140,6 +187,20 @@ function loadItems() {
 }
 items = {};
 loadItems();
+
+/* --- */
+
+function loadNpcs() {
+    var files = fs.readdirSync(__dirname + '/npcs');
+	for (var i = 0; i < files.length; i++) {
+		if (files[i].substr(files[i].length - 4,4) != '.npc') continue;
+		files[i] = files[i].slice(0,-4);
+		npcs.data[files[i]] = new Npc(files[i]);
+	}
+}
+npcs = { data: {}, spawned: [] };
+loadNpcs();
+npcMovement = setInterval(moveNpcs,1000);
 
 /* --- */
 
@@ -307,6 +368,67 @@ http.listen(3000, function(){
 
 /* --- */
 
+function moveNpcs() {
+	var count = new Date().getSeconds();
+	for (var i = 0; i < npcs.spawned.length; i++) {
+		if ((count % npcs.spawned[i].speed) !== 0) continue;
+		// random direction
+		var direction = Math.floor(Math.random()*4);
+		var x = 0;
+        var y = 0;
+        switch (direction) {
+            case 0:
+                y = -1;
+                break;
+
+            case 1:
+                y = 1;
+                break;
+
+            case 2:
+                x = 1;
+                break;
+
+            case 3:
+                x = -1;
+                break;
+
+            default:
+                break;
+        }
+
+        // calculating new coords
+        var newcoords = [npcs.spawned[i].coords[0], npcs.spawned[i].coords[1]];
+        if (npcs.spawned[i].coords[0]+y == maps[npcs.spawned[i].map].dimensions[0]) newcoords[0] = 0;
+        else if (npcs.spawned[i].coords[0]+y < 0) newcoords[0] = maps[npcs.spawned[i].map].dimensions[0] - 1;
+        else newcoords[0] += y;
+
+        if (npcs.spawned[i].coords[1]+x == maps[npcs.spawned[i].map].dimensions[1]) newcoords[1] = 0;
+        else if (npcs.spawned[i].coords[1]+x < 0) newcoords[1] = maps[npcs.spawned[i].map].dimensions[1] - 1;
+        else newcoords[1] += x;
+		
+		// checking collision
+		switch (maps[npcs.spawned[i].map].data[newcoords[0]][newcoords[1]]) {
+			case '~':
+			case '-':
+				break;
+			default:
+				// removing actual npc location on the map for other players
+				var socketIndex = maps[npcs.spawned[i].map].playersAt[npcs.spawned[i].coords[0]][npcs.spawned[i].coords[1]].indexOf(npcs.spawned[i]);
+				maps[npcs.spawned[i].map].playersAt[npcs.spawned[i].coords[0]][npcs.spawned[i].coords[1]].splice(socketIndex,1);
+				// updating npc's own location
+				npcs.spawned[i].coords = newcoords;
+				// updating npc location on the map for other players
+				maps[npcs.spawned[i].map].playersAt[npcs.spawned[i].coords[0]][npcs.spawned[i].coords[1]].push(npcs.spawned[i]);
+
+				// updating map of nearby players
+				updateNearby(npcs.spawned[i]);
+
+				break;
+		}
+	}
+}
+
 function drawFullMap(socket) {
     var buffer = [];
     for (var i = 0; i < maps[socket.player.map].dimensions[0]; i++) {
@@ -347,13 +469,16 @@ function whatIsHere(socket) {
     var items = [];
     for (var i = 0; i < total; i++) {
         if (maps[socket.player.map].playersAt[socket.player.coords[0]][socket.player.coords[1]][i] == socket) continue;
-        items.push(maps[socket.player.map].playersAt[socket.player.coords[0]][socket.player.coords[1]][i].player.name);
+		var object = maps[socket.player.map].playersAt[socket.player.coords[0]][socket.player.coords[1]][i];
+		if (object.npc === true) items.push(object.name);
+        else items.push(object.player.name);
     }
     socket.emit('what is here',items);
 }
 
 function updateNearby(socket) {
     var limit = [4,4];
+	if (socket.npc === true) socket.player = socket;
     for (var i = socket.player.coords[0]-limit[0]; i <= socket.player.coords[0]+limit[0]; i++) {
         if (i >= maps[socket.player.map].dimensions[0]) map_y = i-maps[socket.player.map].dimensions[0];
         else if (i < 0) map_y = maps[socket.player.map].dimensions[0]+i;
@@ -364,11 +489,13 @@ function updateNearby(socket) {
             else map_x = j;
             // broadcast to nearby players including the client itself
             for (var k = 0; k < maps[socket.player.map].playersAt[map_y][map_x].length; k++) {
+				if (maps[socket.player.map].playersAt[map_y][map_x][k].npc === true) continue; // if it's a npc, skip
                 drawVisible(maps[socket.player.map].playersAt[map_y][map_x][k]);
                 whatIsHere(maps[socket.player.map].playersAt[map_y][map_x][k]);
             }
         }
     }
+	if (socket.npc === true) delete socket.player;
 }
 
 function sendCoords(socket) {

@@ -1,0 +1,7 @@
+name:Citizen
+map:city
+spawn:11,19
+type:talk
+speed:3
+talk:This is amazing
+talk:Hello there
